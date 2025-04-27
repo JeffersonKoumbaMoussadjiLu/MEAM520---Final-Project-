@@ -71,13 +71,15 @@ class IK:
         displacement = np.zeros(3)
         axis = np.zeros(3)
 
-        # Translation matrix last column
+        target_position = target[0:3, 3]
+        current_position = current[0:3, 3]
 
-        # Calculate position displacement
-        displacement = target[:3, 3] - current[:3, 3]
+        target_rotation = target[:3, :3]
+        current_rotation = current[:3, :3]
 
-        # Calculate rotation axis using calcAngDiff
-        axis = calcAngDiff(target[:3, :3], current[:3, :3])
+        axis = calcAngDiff(target_rotation, current_rotation)
+
+        displacement = target_position - current_position
 
         ## END STUDENT CODE
         return displacement, axis
@@ -102,24 +104,19 @@ class IK:
         distance - the distance in meters between the origins of G & H
         angle - the angle in radians between the orientations of G & H
         """
-
+        
         ## STUDENT CODE STARTS HERE
         distance = 0
         angle = 0
 
-        # Calculate distance between origins
-        distance = np.linalg.norm(G[:3, 3] - H[:3, 3])
+        G_vec = G[:3, 3]
+        H_vec = H[:3, 3]
 
-        # Calculate angle between orientations
-        # Use rotation matrix from G to H: R = H^T * G
-        R_G_H = np.dot(H[:3, :3].T, G[:3, :3])
+        distance = np.linalg.norm(G_vec - H_vec)
 
-        # Angle from trace formula => cos(theta) = (tr(R) - 1) / 2
-        cos_angle = (np.trace(R_G_H) - 1) / 2
-
-        # Ensure value is between [-1, 1] for arccos
-        cos_angle = max(-1.0, min(1.0, cos_angle))
-        angle = np.arccos(cos_angle)
+        rotation = np.dot(np.transpose(H), G)
+        rotation_trace = (np.trace(rotation) - 1) / 2
+        angle = np.arccos(np.clip(rotation_trace, -1.0, 1.0))
 
         ## END STUDENT CODE
         return distance, angle
@@ -144,26 +141,22 @@ class IK:
         ## STUDENT CODE STARTS HERE
         success = False
         message = "Solution found/not found + reason"
+        
+        # Check Joint Limits
+        if not (np.all((q >= self.lower) & (q <= self.upper))):
+            return False, "Solution not found because joint limits not satisfied"
+    
+        _, transformation_matrix = IK.fk.forward(q)
 
-        # Check if joint angles are within limits
-        if np.any(q < self.lower) or np.any(q > self.upper):
-            return False, "Joint limits violated"
+        distance, angle = IK.distance_and_angle(target, transformation_matrix)
 
-        # Calculate forward kinematics to get current end effector pose
-        joints, current_pose = self.fk.forward(q)
+        # Check linear tolerance and angular tolerance
+        if distance > self.linear_tol or angle > self.angular_tol:
+            return False, "Solution not found beacause tolerances not satisfied"
+        
+        success = True
+        message = "Solution found"
 
-        # Check if the end effector is close enough to the target
-        distance, angle = self.distance_and_angle(target, current_pose)
-
-        if distance <= self.linear_tol and angle <= self.angular_tol:
-            success = True
-            message = "Solution found within tolerances"
-        else:
-            success = False
-            if distance > self.linear_tol:
-                message = f"Position error {distance:.6f} exceeds tolerance"
-            else:
-                message = f"Orientation error {angle:.6f} exceeds tolerance"
 
         ## END STUDENT CODE
         return success, message
@@ -182,9 +175,9 @@ class IK:
         INPUTS:
         q - the current joint configuration, a "best guess" so far for the final answer
         target - a 4x4 numpy array containing the desired end effector pose
-        method - a boolean variable that determines to use either 'J_pseudo' or 'J_trans'
+        method - a boolean variable that determines to use either 'J_pseudo' or 'J_trans' 
         (J pseudo-inverse or J transpose) in your algorithm
-
+        
         OUTPUTS:
         dq - a desired joint velocity to perform this task, which will smoothly
         decay to zero magnitude as the task is achieved
@@ -193,46 +186,28 @@ class IK:
         ## STUDENT CODE STARTS HERE
         dq = np.zeros(7)
 
-        # Calculate forward kinematics
-        fk = FK()
-        joints, current_pose = fk.forward(q)
+        _, current = IK.fk.forward(q)
 
-        # Calculate displacement and axis using the helper function
-        displacement, axis = IK.displacement_and_axis(target, current_pose)
+        displacement, axis = IK.displacement_and_axis(target, current)
 
-        # Combine linear and angular velocity into a single 6D vector
-        velocity = np.concatenate([displacement, axis])
+        e = np.concatenate((displacement, axis)) 
 
-        # Calculate the Jacobian
-        J = calcJacobian(q)
+        J = calcJacobian(q) 
 
-        # Handle NaN values if any
+        valid_mask = ~np.isnan(e)
+        e_clean = e[valid_mask]
+        J_clean = J[valid_mask, :]
 
-        # Combine into a single error vector
-        error = np.concatenate((displacement, axis))
-        error = error.reshape(-1, 1)  # Reshape to column vector
-
-        nan_indices = np.isnan(error)
-        if np.any(nan_indices):
-            indices = np.where(nan_indices)[0]
-            error = np.delete(error, indices, axis=0)
-            J = np.delete(J, indices, axis=0)
-
-        # Compute joint velocities based on the selected method
         if method == 'J_pseudo':
-            # Pseudo-inverse method
-            J_pinv = np.linalg.pinv(J)
-            dq = J_pinv @ velocity
-
+            dq = np.dot(np.linalg.pinv(J_clean), e_clean)
         elif method == 'J_trans':
-            # Transpose method
-            dq = J.T @ velocity
+            dq = np.dot(J_clean.T, e_clean)
 
         ## END STUDENT CODE
         return dq
 
     @staticmethod
-    def joint_centering_task(q,rate=5e-1):
+    def joint_centering_task(q,rate=5e-1): 
         """
         Secondary task for IK solver. Computes a joint velocity which will
         reduce the offset between each joint's angle and the center of its range
@@ -256,7 +231,7 @@ class IK:
         dq = rate * -offset # proportional term (implied quadratic cost)
 
         return dq
-
+        
     ###############################
     ## Inverse Kinematics Solver ##
     ###############################
@@ -270,7 +245,7 @@ class IK:
         end effector to world
         seed - 1x7 vector of joint angles [q0, q1, q2, q3, q4, q5, q6], which
         is the "initial guess" from which to proceed with optimization
-        method - a boolean variable that determines to use either 'J_pseudo' or 'J_trans'
+        method - a boolean variable that determines to use either 'J_pseudo' or 'J_trans' 
         (J pseudo-inverse or J transpose) in your algorithm
 
         OUTPUTS:
@@ -285,10 +260,10 @@ class IK:
         rollout = []
 
         ## STUDENT CODE STARTS HERE
-        #steps = 0
-
+        iteration = 0
+        
         ## gradient descent:
-        while True:
+        while iteration < self.max_steps:
             rollout.append(q)
 
             # Primary Task - Achieve End Effector Pose
@@ -298,39 +273,20 @@ class IK:
             dq_center = IK.joint_centering_task(q)
 
             ## Task Prioritization
-
-            # Compute null space of Jacobian
             J = calcJacobian(q)
+            J_pinv = np.linalg.pinv(J)
+            null_projection = np.eye(7) - np.dot(J_pinv, J)
 
-            if method == 'J_pseudo':
-
-                # Create identity matrix
-                I = np.identity(7)
-
-                # Pseudo-inverse of Jacobian
-                J_pinv = np.linalg.pinv(J)
-
-                # Null space projection
-                null_proj = I - np.dot(J_pinv, J)
-
-                # Project secondary task onto null space
-                null_dq = np.dot(null_proj, dq_center)
-
-                # Combine primary and secondary tasks
-                dq = dq_ik + null_dq
-
-            else:
-
-                # For J_trans method, just use the primary task
-                dq = dq_ik
+            dq = dq_ik + np.dot(null_projection, dq_center)
 
             # Check termination conditions
-            if len(rollout) >= self.max_steps or np.linalg.norm(dq) <= self.min_step_size:
+            if np.linalg.norm(alpha * dq) < self.min_step_size:
                 break
 
-            # Update q with step size alpha
+            # update q
             q = q + alpha * dq
-
+            iteration += 1
+            
 
         ## END STUDENT CODE
 
@@ -357,7 +313,7 @@ if __name__ == "__main__":
         [0,0,0, 1],
     ])
 
-    # Using pseudo-inverse
+    # Using pseudo-inverse 
     q_pseudo, rollout_pseudo, success_pseudo, message_pseudo = ik.inverse(target, seed, method='J_pseudo', alpha=.5)
 
     for i, q_pseudo in enumerate(rollout_pseudo):
@@ -365,7 +321,7 @@ if __name__ == "__main__":
         d, ang = IK.distance_and_angle(target,pose)
         print('iteration:',i,' q =',q_pseudo, ' d={d:3.4f}  ang={ang:3.3f}'.format(d=d,ang=ang))
 
-    # Using pseudo-inverse
+    # Using pseudo-inverse 
     q_trans, rollout_trans, success_trans, message_trans = ik.inverse(target, seed, method='J_trans', alpha=.5)
 
     for i, q_trans in enumerate(rollout_trans):

@@ -3,7 +3,7 @@ import numpy as np
 
 def calcAngDiff(R_des, R_curr):
     """
-    Helper function for the End Effector Orientation Task. Computes the axis of rotation
+    Helper function for the End Effector Orientation Task. Computes the axis of rotation 
     from the current orientation to the target orientation
 
     This data can also be interpreted as an end effector velocity which will
@@ -21,27 +21,13 @@ def calcAngDiff(R_des, R_curr):
     """
     omega = np.zeros(3)
     ## STUDENT CODE STARTS HERE
+    relative_rotation = np.dot(np.transpose(R_curr),R_des)  
+    S = 0.5 * (relative_rotation - np.transpose(relative_rotation))
+    omega = np.array([S[2, 1], S[0, 2], S[1, 0]])
 
-    # Relative rotation in the current frame
-    # Current orientation (R_curr) to the desired (R_des)
-    R_rel = R_curr.T @ R_des
+    sin_theta = np.linalg.norm(omega)                      
 
-    # Skew-symmetric part of R_rel
-    S = 0.5 * (R_rel - R_rel.T)
-
-    # Extract "axis * sin(theta)" in the CURRENT frame
-    a = np.array([S[2,1], S[0,2], S[1,0]])  # shape (3,)
-
-    # If sin(theta) = 0 => zero rotation
-    sin_theta = np.linalg.norm(a)
-
-    if sin_theta != 0:
-        omega = a
-    else:
+    if sin_theta == 0:
         omega = np.zeros(3)
 
-    # Now we convert a into the WORLD frame
-    # a is expressed in current frame => multiply by R_curr to get it in world frame
-    omega = R_curr @ a
-
-    return omega
+    return np.dot(R_curr, omega)

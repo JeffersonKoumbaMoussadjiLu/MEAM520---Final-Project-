@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np 
 from lib.calcJacobian import calcJacobian
 
 
@@ -24,21 +24,15 @@ def IK_velocity(q_in, v_in, omega_in):
     v_in = v_in.reshape((3,1))
     omega_in = omega_in.reshape((3,1))
 
-    # Construct full 6D velocity target: [v_in; omega_in]
-    #    shape will be (6,)
-    desired_velocity = np.concatenate([v_in.flatten(), omega_in.flatten()])
-
-    # Identify which entries are not NaN
-    mask = ~np.isnan(desired_velocity)  # boolean array of shape (6,)
-
-    # Get full Jacobian J (6 x 7)
     J = calcJacobian(q_in)
 
-    # Slice Jacobian and target velocity to keep only valid constraints
-    J = J[mask, :]          # shape (k, 7), where k <= 6
-    desired_velocity = desired_velocity[mask]  # shape (k,)
+    v_target = np.vstack((v_in, omega_in))
 
-    # Solve in a least-squares sense using numpy
-    dq, residuals, rank, s = np.linalg.lstsq(J, desired_velocity, rcond=None)
+    mask = ~np.isnan(v_target).flatten()
 
+    J_mask = J[mask, :]
+    v_mask = v_target[mask]
+
+    dq, _, _, _ = np.linalg.lstsq(J_mask, v_mask, rcond=None)
+    
     return dq

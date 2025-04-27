@@ -1,6 +1,5 @@
 import numpy as np
 from lib.calculateFK import FK
-#from calculateFK import FK
 
 def calcJacobian(q_in):
     """
@@ -15,38 +14,24 @@ def calcJacobian(q_in):
 
     ## STUDENT CODE GOES HERE
 
-    # Create an FK instance to get joint positions and axes
     fk = FK()
+    joint_positions, _ = fk.forward(q_in)
+    joint_axis_of_rotations = fk.get_axis_of_rotation(q_in)
 
-    # Compute forward kinematics to get position of each joint
-    joint_positions, T0e = fk.forward(q_in)
+    J_v = np.zeros((3, 7))
+    J_omega = np.zeros((3, 7))
 
-    # end-effector in world-frame
-    o_ee = joint_positions[7] #T0e
-
-    # Get each joint’s rotation axis z_i in world frame
-    z_axes = fk.get_axis_of_rotation(q_in)  # shape (3,7)
-
-    # Build columns of J for i=0..6
+    end_effector_pos = joint_positions[7]
+    
     for i in range(7):
-
-        # Position joint i in world frame
-        o_i = joint_positions[i]
-
-        # Revolute axis is z_axes[:,i]
-        z_i = z_axes[:, i]
-
-        # Linear velocity component = z_i × (o_ee - o_i)
-        J[0:3, i] = np.cross(z_i, (o_ee - o_i))
-
-        # Angular velocity component = z_i
-        J[3:6, i] = z_i
+        J_v[:, i] = np.cross(joint_axis_of_rotations[:, i], (end_effector_pos - joint_positions[i]))
+        J_omega[:, i] = joint_axis_of_rotations[:, i]
+    
+    J = np.vstack((J_v, J_omega))
 
     return J
 
 if __name__ == '__main__':
-    q= np.array([0, 0, 0, -np.pi/2, 0, np.pi/2, np.pi/4])
+    # q= np.array([0, 0, 0, -np.pi/2, 0, np.pi/2, np.pi/4])
+    q= np.array([0, 0, 0, 0, 0, np.pi, np.pi/4])
     print(np.round(calcJacobian(q),3))
-
-    dq = np.array([1, 0, 0, 0, 0, 0, 0])
-    #print(np.round(FK))

@@ -1,5 +1,5 @@
 import numpy as np
-from math import pi, cos, sin
+from math import pi
 
 class FK():
 
@@ -8,91 +8,20 @@ class FK():
         # TODO: you may want to define geometric parameters here that will be
         # useful in computing the forward kinematics. The data you will need
         # is provided in the lab handout
+        pass
 
-        # DH parameters for each joints  (a, alpha, d, theta_offset, q_offset)
-        self.joints = [
-            {   # Joint 0
-                'a': 0,
-                'alpha': 0,
-                'd': 0.141,
-                'theta_offset': 0,
-                'q_offset': 0
-            },
-            {   # Joint 1
-                'a': 0,
-                'alpha': -np.pi/2,
-                'd': 0.192,
-                'theta_offset': 0,
-                'q_offset': 0
-            },
-            {   # Joint 2
-                'a': 0,
-                'alpha': np.pi/2,
-                'd': 0,
-                'theta_offset': 0,
-                'q_offset': 0
-            },
-            {   # Joint 3
-                'a': 0.0825,
-                'alpha': np.pi/2,
-                'd': 0.195 + 0.121,  # 0.195 + 0.121 = 0.316
-                'theta_offset': 0,
-                'q_offset': 0
-            },
-            {   # Joint 4
-                'a': 0.0825,
-                'alpha': np.pi/2,
-                'd': 0,
-                'theta_offset': np.pi/2,
-                'q_offset': -np.pi/2
-            },
-            {   # Joint 5
-                'a': 0,
-                'alpha': -np.pi/2,
-                'd': 0.259 + 0.125,  # 0.259 + 0.125 = 0.384
-                'theta_offset': 0,
-                'q_offset': 0
-            },
-            {   # Joint 6
-                'a': 0.088,
-                'alpha': np.pi/2,
-                'd': 0,
-                'theta_offset': -np.pi/2,
-                'q_offset': np.pi/2
-            },
-            {   # Joint 7
-                'a': 0,
-                'alpha': 0,
-                'd': 0.051 + 0.159,  # 0.051 + 0.159 = 0.210
-                'theta_offset': 0,
-                'q_offset': np.pi/4
-            }
-        ]
-
-        # Adjustments for specific joints: {joint_index: offset}
-        self.adjustments = {2: 0.195, 4: 0.125, 5: -0.015, 6: 0.051}
-
-    ##############################################################################
-    # feel free to define additional helper methods to modularize your solution for lab 1
-
-    # Helper function
-
-    # Function to compute 4x4 homogeneous transformation matrix using DH parameters
-    def compute_dh_matrix(self, a, alpha, d, theta):
-
-        cos_theta = np.cos(theta)
-        sin_theta = np.sin(theta)
-        cos_alpha = np.cos(alpha)
-        sin_alpha = np.sin(alpha)
+    def get_homogeneous_matrix(self, index, dh_array):
+        a = dh_array[index][0]
+        alpha = dh_array[index][1]
+        d = dh_array[index][2]
+        theta = dh_array[index][3]
 
         return np.array([
-            [cos_theta, -sin_theta * cos_alpha, sin_theta * sin_alpha, a * cos_theta],
-            [sin_theta, cos_theta * cos_alpha, -cos_theta * sin_alpha, a * sin_theta],
-            [0,          sin_alpha,             cos_alpha,             d          ],
-            [0,          0,                      0,                     1          ]
+            [np.cos(theta), -1 * np.sin(theta) * np.cos(alpha), np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
+            [np.sin(theta), np.cos(theta) * np.cos(alpha), -1 * np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
+            [0, np.sin(alpha), np.cos(alpha), d],
+            [0, 0, 0, 1]
         ])
-
-    ############################################################################
 
     def forward(self, q):
         """
@@ -109,46 +38,51 @@ class FK():
         """
 
         # Your Lab 1 code starts here
+        theta_1, theta_2, theta_3, theta_4, theta_5, theta_6, theta_7 = q
 
-##################################################################################
-        #Joints positions and Transformations
+        # a, alpha, d, theta
+        dh_params = np.array([
+            [0, -pi/2, 0.333, theta_1],
+            [0, pi/2, 0, theta_2],
+            [0.0825, pi/2, 0.316, theta_3],
+            [0.0825, pi/2, 0, pi + theta_4],
+            [0, -pi/2, 0.384, theta_5],
+            [0.088, pi/2, 0, theta_6 - pi],
+            [0, 0, 0.21, theta_7 - pi/4]
+        ])
+
+        joint_offsets = np.array([
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.195, 1.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.125, 1.0],
+            [0.0, 0.0, -0.015, 1.0],
+            [0.0, 0.0, 0.051, 1.0],
+            [0.0, 0.0, 0.0, 1.0]
+        ])
+
+
         jointPositions = np.zeros((8,3))
         T0e = np.identity(4)
 
-        q = np.insert(q, 0, 0)  # Add 0 angle at the start  for the fixed base joint
+        jointPositions[0] = [0.0, 0.0, 0.141]
 
-        transforms = [] #Store all the transformation matrices [T0_1, 1_2, ... Tn-1_n]
-
-        #Loop through all the joints
-        for i in range(8):
-
-            joint = self.joints[i]
-
-            theta = q[i] - joint['q_offset'] + joint['theta_offset'] # Compute theta
-
-            dh = self.compute_dh_matrix(joint['a'], joint['alpha'], joint['d'], theta) #Compute the DH transform for this link (joints)
-
-            T0e = T0e @ dh #Compute T0_i = A0 * A1 * ... * Ai (current_transform T0_i)
-
-            transforms.append(T0e)
-            jointPositions[i] = T0e[:3, 3] # Get the translation vector(joint Positions) in the transformations matrix (Last column)
-
-        # Apply adjustments to specific joints (joints 2,4,5)
-        for idx, offset in self.adjustments.items():
-
-            rot_matrix = transforms[idx][:3, :3] #Get rotation Matrix from transformation matrix for the given joint
-
-            # Compute adjustment vector by applying the rotation matrix to the offset vector [0, 0, offset].
-            # This ensures that the offset is applied in the correct orientation relative to the joint's frame (From Office Hours)
-            adjustment = rot_matrix @ np.array([0, 0, offset])
-
-            jointPositions[idx] += adjustment
+        for i in range(7):
+            H = self.get_homogeneous_matrix(i, dh_params)
+            if i == 0:
+                T0e = H
+                jointPositions[i+1] = np.dot(T0e, joint_offsets[i])[:3]
+            else:
+                T0e = np.dot(T0e, H)
+                jointPositions[i+1] = np.dot(T0e, joint_offsets[i])[:3]
 
         # Your code ends here
 
         return jointPositions, T0e
 
+    # feel free to define additional helper methods to modularize your solution for lab 1
 
+    
     # This code is for Lab 2, you can ignore it ofr Lab 1
     def get_axis_of_rotation(self, q):
         """
@@ -161,29 +95,34 @@ class FK():
 
         """
         # STUDENT CODE HERE: This is a function needed by lab 2
+        axis_of_rotation_list = np.zeros((3, 7))
+        T0 = np.eye(4)  # Base frame transformation
 
-        axes = np.zeros((3,7))
+        # Define the DH parameters (same as in the forward function)
+        theta_1, theta_2, theta_3, theta_4, theta_5, theta_6, theta_7 = q
+        dh_params = np.array([
+            [0, -pi/2, 0.333, theta_1],
+            [0,  pi/2, 0,     theta_2],
+            [0.0825, pi/2, 0.316, theta_3],
+            [0.0825, pi/2, 0,     pi + theta_4],
+            [0, -pi/2, 0.384, theta_5],
+            [0.088,  pi/2, 0,     theta_6 - pi],
+            [0,     0,    0.21,  theta_7 - pi/4]
+        ])
 
-        # Start from identity as T_{base}, ignoring the “fixed base”
-        T = np.eye(4)
-        q = np.insert(q, 0, 0)
-
+        # For each joint, extract the z-axis and update the transformation matrix.
         for i in range(7):
-            jnt = self.joints[i]
-            # Compute the revolute joint’s axis angle
-            theta = q[i] - jnt['q_offset'] + jnt['theta_offset']
-
-            A = self.compute_dh_matrix(jnt['a'], jnt['alpha'], jnt['d'], theta)
-            T = T @ A    # T0i
-
-            # The z-axis of the i-th joint is the 3rd column of T0i’s rotation
-            z_axis_world = T[:3,2]
-            axes[:, i] = z_axis_world
-
-        return axes
-
-        #return()
-
+            # The current joint's axis (z-axis of the current frame) in the world frame.
+            axis_of_rotation_list[:, i] = T0[:3, 2]
+            
+            # Get the transformation matrix for the current joint.
+            H = self.get_homogeneous_matrix(i, dh_params)
+            
+            # Update the cumulative transformation.
+            T0 = T0.dot(H)
+        
+        return axis_of_rotation_list
+    
     def compute_Ai(self, q):
         """
         INPUT:
@@ -195,30 +134,17 @@ class FK():
         """
         # STUDENT CODE HERE: This is a function needed by lab 2
 
-        A_list = []
-        # Insert dummy 0 for “fixed base”
-        q = np.insert(q, 0, 0)
-
-        for i in range(8):
-            jnt = self.joints[i]
-            theta = q[i] - jnt['q_offset'] + jnt['theta_offset']
-            A = self.compute_dh_matrix(jnt['a'], jnt['alpha'], jnt['d'], theta)
-            A_list.append(A)
-
-        return A_list
-
-        #return()
-
+        return()
+    
 if __name__ == "__main__":
 
     fk = FK()
 
     # matches figure in the handout
-    #q = np.array([0,0,0,-pi/2,0,pi/2,pi/4])
-    q = np.array([0,0,0,0,0,0,0])
-
+    q = np.array([0,0,0,-pi/2,0,pi/2,pi/4])
+    # q = np.array([0,0,0,0,0,0,0])
 
     joint_positions, T0e = fk.forward(q)
-
+    
     print("Joint Positions:\n",joint_positions)
     print("End Effector Pose:\n",T0e)

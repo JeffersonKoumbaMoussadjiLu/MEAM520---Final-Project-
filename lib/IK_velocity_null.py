@@ -19,8 +19,6 @@ def IK_velocity_null(q_in, v_in, omega_in, b):
     """
 
     ## STUDENT CODE GOES HERE
-
-    '''
     dq = np.zeros((1, 7))
     null = np.zeros((1, 7))
     b = b.reshape((7, 1))
@@ -28,55 +26,20 @@ def IK_velocity_null(q_in, v_in, omega_in, b):
     v_in = v_in.reshape((3,1))
     omega_in = np.array(omega_in)
     omega_in = omega_in.reshape((3,1))
-    '''
 
-    '''
-    # Calculate primary IK velocity solution
-    dq = IK_velocity(q_in, v_in, omega_in)
-
-    # Calculate Jacobian
     J = calcJacobian(q_in)
+    twist = np.vstack((v_in, omega_in))
 
-    # Make sure b is the right shape (7x1)
-    b = np.array(b).reshape(7, 1)
+    mask = ~np.isnan(twist).flatten()
 
-    # Calculate pseudoinverse of Jacobian
-    J_pinv = np.linalg.pinv(J)
+    J_mask = J[mask, :]
+    twist_mask = twist[mask]
 
-    # Calculate null-space projector (I - J^(+)J)
-    I = np.eye(7)  # Identity matrix of size 7x7
-    null_space_projector = I - (J_pinv @ J)
+    J_pinv = np.linalg.pinv(J_mask)
 
-    # Project secondary task onto the null space
-    null = (null_space_projector @ b).T  # Convert to row vector
+    dq = np.dot(J_pinv, twist_mask)
+
+    null = np.dot(np.eye(7) - np.dot(J_pinv, J_mask), b) 
 
     return dq + null
-    '''
 
-    dq = IK_velocity(q_in, v_in, omega_in)
-
-    # Setup velocity inputs
-    v_in = np.array(v_in).reshape(-1)
-    omega_in = np.array(omega_in).reshape(-1)
-    b = np.array(b).reshape(7, 1)
-
-    # Construct full 6D velocity target and find which entries are not NaN
-    desired_velocity = np.concatenate([v_in, omega_in])
-    mask = ~np.isnan(desired_velocity)  # boolean array of shape (6,)
-
-    # Get full Jacobian
-    J = calcJacobian(q_in)
-
-    # Slice Jacobian to keep only rows corresponding to non-NaN velocity components
-    J_constrained = J[mask, :]
-
-    # Calculate pseudoinverse of constrained Jacobian
-    J_pinv = np.linalg.pinv(J_constrained)
-
-    # Calculate null-space projector (I - J⁺J) using the constrained Jacobian
-    null_space_projector = np.eye(7) - (J_pinv @ J_constrained)
-
-    # Project secondary task onto the null space
-    null = (null_space_projector @ b).T
-
-    return dq + null
