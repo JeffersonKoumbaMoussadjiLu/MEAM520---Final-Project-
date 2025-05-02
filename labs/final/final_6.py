@@ -458,6 +458,11 @@ if __name__ == "__main__":
         target_H = static_grabber.find_closest(result_list)
         static_grabber.grab(target_H, i)
 
+        if i == 0:
+            static_grabber.put(i)
+            print("Placed first block directly at set_point[0].\n")
+            continue
+
         # ─── NEW ────────────────────────────────────────────────────────
         # 2) lift straight up to get a clean view of the tower
         static_grabber.go_to_top_of_tower()  
