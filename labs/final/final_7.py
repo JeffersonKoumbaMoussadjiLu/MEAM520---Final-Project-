@@ -22,7 +22,11 @@ class StaticGrabber:
         self.fk = fk
 
         # Initial pose to view all static blocks
-        self.initial_view_pose = np.array([0.0, -0.8,  0.2, -2.5, 0.0, 1.5, 1.0])
+        if team == 'red':
+            self.initial_view_pose = np.array([-0.15498,  0.22828, -0.15683, -1.05843,  0.03686,  1.28419,  0.48802])
+        else:
+            # UPDATE THIS: INCORRECT
+            self.initial_view_pose = np.array([0.0, -0.8,  0.2, -2.5, 0.0, 1.5, 1.0])
 
         # Placeholder for dynamic scan positions; computed on demand
         self.dynamic_over_positions = []
@@ -51,6 +55,7 @@ class StaticGrabber:
             # Orientation: point down
             R = np.eye(3)
             R[2,2] = -1
+            R[1,1] = -1
             T_above[:3,:3] = R
             T_above[:3,3] = pos + np.array([0, 0, 0.10])
 
