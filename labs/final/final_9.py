@@ -298,6 +298,7 @@ class DynamicGrabber():
     def solve_ik(self, target, seed):
         t = time_in_seconds()
         T = t - self.start_time
+        print("seed: ", seed)
         _, T0e = fk.forward(seed)
 
         # Current joint positions
@@ -307,18 +308,20 @@ class DynamicGrabber():
 
         q = seed
 
-        xdes = target[:3, 3].flatten()
+        xdes = target[:3, 3].flatten() + np.array([0, 0.01, 0]) # destination offset
         delta_x = xdes - curr_x
-        vdes = delta / T if t < T else np.zeros(3)
+        print("delta: ", delta_x, xdes, curr_x, T)
+        vdes = delta_x / T
+        print("vdes: " , vdes)
 
         Rdes, ang_vdes = np.eye(3), np.zeros(3)
 
         # Proportional & feed-forward for position
-        kp = 2.0  # reduced from 5.0
+        kp = 1.0  # reduced from 5.0
         v = vdes + kp * (delta_x)
 
         # Proportional & feed-forward for orientation
-        kr = 2.0  # reduced from 5.0
+        kr = 1.0  # reduced from 5.0
         omega = ang_vdes + kr * calcAngDiff(Rdes, R).flatten()
 
         # Null-space secondary task
@@ -329,18 +332,19 @@ class DynamicGrabber():
 
         # Set q_e to midrange or some comfortable posture
         q_e = lower + (upper - lower)/2.0
-        k0 = 0.3  # moderate null-space gain
+        k0 = 1.0  # moderate null-space gain
 
         # Velocity IK with null-space
         dq = IK_velocity_null(q, v, omega, -k0*(q - q_e)).flatten()
-
+        print("dq: ", dq)
         # Time step
         if self.last_iteration_time is None:
             self.last_iteration_time = time_in_seconds()
-        self.dt = time_in_seconds() - self.last_iteration_time
+        # self.dt = time_in_seconds() - self.last_iteration_time
         self.last_iteration_time = time_in_seconds()
 
-        new_q = q + self.dt * dq
+        new_q = q + dq
+        print(new_q)
 
         return new_q
 
