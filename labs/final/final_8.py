@@ -22,11 +22,10 @@ class StaticGrabber:
         self.fk = fk
 
         # Initial pose to view all static blocks
-        if team == 'red':
-            self.initial_view_pose = np.array([-0.15498,  0.22828, -0.15683, -1.05843,  0.03686,  1.28419,  0.48802])
+        if team == 'blue':
+            self.initial_view_pose = np.array([0.24172, 0.22626, 0.0456, -1.05856, -0.01066, 1.28461, 1.06855])
         else:
-            # UPDATE THIS: INCORRECT
-            self.initial_view_pose = np.array([0.0, -0.8,  0.2, -2.5, 0.0, 1.5, 1.0])
+            self.initial_view_pose = np.array([-0.15498,  0.22828, -0.15683, -1.05843,  0.03686,  1.28419,  0.48802])
 
         # Placeholder for dynamic scan positions; computed on demand
         self.dynamic_over_positions = []
@@ -63,7 +62,7 @@ class StaticGrabber:
             q_above, _, success, _ = self.ik.inverse(
                 T_above, q_seed, method='J_pseudo', alpha=0.5)
             if not success:
-                raise RuntimeError("IK failed computing scan position.")
+                    raise RuntimeError("IK failed computing scan position.")
             self.dynamic_over_positions.append(q_above)
 
     def move_to_over(self, i):
@@ -169,6 +168,7 @@ class StaticGrabber:
         return np.array([-0.1344,0.1814,-0.1515,-1.1668,0.0279,1.3463,0.5082]) if team == 'blue' else np.array([0.2123,0.1799,0.058,-1.1669,-0.0106,1.3465,1.0525])
 
     def _apply_calibration_offsets(self):
+        '''
         if self.team == 'blue':
             self.H_ee_camera[0,-1] -= 0.035
             self.H_ee_camera[1,-1] += 0.005
@@ -177,6 +177,7 @@ class StaticGrabber:
             self.H_ee_camera[0,-1] += 0.01
             self.H_ee_camera[1,-1] -= 0.036
             self.H_ee_camera[2,-1] += 0.008
+        '''
 
 
 class DynamicGrabber():
@@ -375,8 +376,11 @@ if __name__ == "__main__":
     # Now compute dynamic scan positions when ready
     static_grabber.compute_scan_positions()
 
+    # Number of successfully scanned blocks
+    num_scanned = len(static_grabber.dynamic_over_positions)
+
     # Static block phase
-    for i in range(4):
+    for i in range(num_scanned):
         static_grabber.move_to_over(i)
         sleep(2)
         trans = static_grabber.detect_and_convert()
