@@ -195,11 +195,32 @@ class DynamicGrabber():
 
 
         # Initial pose to view all static blocks
+        ################################ Different
         if team == 'red':
-            self.initial_view_pose = np.array([-0.83, -0.93, 1.72, -1.14, 0.93, 1.43, -1.18])
+            self.initial_view_pose = np.array(
+                [
+                    -0.83,
+                    -0.93 - 0.3,
+                    1.72 - 0.05,
+                    -1.14 + 0.2,
+                    0.93 + 0.25,
+                    1.63 + 0.1,
+                    -1.18 - 0.2
+                ])#[-0.83, -0.93, 1.72, -1.14, 0.93, 1.43, -1.18]
         else:
             # UPDATE THIS: INCORRECT
-            self.initial_view_pose = np.array([0.84, -0.88, -1.8, -1.15, -0.84, 1.47, -0.42],)
+            self.initial_view_pose = np.array(
+                [
+                    0.84,
+                    -0.88 - 0.3,
+                    -1.8 + 0.05,
+                    -1.15 + 0.2,
+                    -0.84 - 0.25,
+                    1.47 + 0.1,
+                    -0.42 - 0.2
+                ])#0.84, -0.88, -1.8, -1.15, -0.84, 1.47, -0.42
+        
+        ################################ Different
 
         # Placeholder for dynamic scan positions; computed on demand
         self.dynamic_over_positions = []
@@ -301,7 +322,10 @@ class DynamicGrabber():
 
         q = seed
 
-        xdes = target[:3, 3].flatten() + np.array([-0.05, -0.03, 0.05]) # destination offset [-0.005, -0.03, 0]) left -y down -z in -x
+
+        ################################ Different
+        xdes = target[:3, 3].flatten() + np.array([-0.05, -0.03, 0.025]) # destination offset [-0.005, -0.03, 0]) left -y down -z in -x
+        ################################ Different
         delta_x = xdes - curr_x
         print("delta: ", delta_x, xdes, curr_x, T),
         vdes = delta_x / T
