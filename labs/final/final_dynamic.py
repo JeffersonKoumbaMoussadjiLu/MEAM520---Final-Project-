@@ -281,9 +281,16 @@ class DynamicGrabber():
         best[2] = 0
         return best / np.linalg.norm(best)
 
-    def solve_ik(self, target, seed):
-        t = time_in_seconds()
-        T = t - self.start_time
+    def solve_ik_grab(self, target, seed):
+        print("TARGET: ", target)
+        # t = time_in_seconds()
+        # T = t - self.start_time
+        # print("Time: ", T, t, self.start_time)
+
+        # if T == 0:
+        #     T = 1
+        T = 5.0
+        
         print("seed: ", seed)
         _, T0e = fk.forward(seed)
 
@@ -294,7 +301,7 @@ class DynamicGrabber():
 
         q = seed
 
-        xdes = target[:3, 3].flatten() + np.array([-0.025, -0.03, 0]) # destination offset [0, 0.01, 0]
+        xdes = target[:3, 3].flatten() + np.array([-0.05, -0.03, 0.05]) # destination offset [-0.005, -0.03, 0]) left -y down -z in -x
         delta_x = xdes - curr_x
         print("delta: ", delta_x, xdes, curr_x, T),
         vdes = delta_x / T
@@ -329,6 +336,7 @@ class DynamicGrabber():
         # self.dt = time_in_seconds() - self.last_iteration_time
         self.last_iteration_time = time_in_seconds()
 
+        # 
         new_q = q + dq
         print(new_q)
 
@@ -355,10 +363,15 @@ class DynamicGrabber():
         #     target, seed,)
         # print('IK:', success, msg)
         # return q if success else None
+    def solve_ik_place(self, target, seed):
+        q, _, success, msg = self.ik.inverse(
+            target, seed, method='J_pseudo', alpha=0.75)
+        print('IK:', success, msg)
+        return q if success else None
 
     def grab(self, T_base_blk, idx):
         target = self.find_target_ee_pose(T_base_blk)
-        q = self.solve_ik(target, self.arm.get_positions())
+        q = self.solve_ik_grab(target, self.arm.get_positions())
         if q is None:
             print('IK failed, skipping')
             return
@@ -513,10 +526,6 @@ if __name__ == "__main__":
             # Find closest block to grab
             target = dynamic_grabber.find_closest(trans)
             
-            # Reset start time for velocity calculations
-            dynamic_grabber.start_time = time_in_seconds()
-            dynamic_grabber.last_iteration_time = None
-            
             # Try to grab the block
             dynamic_grabber.grab(target, 0)
             
@@ -529,7 +538,7 @@ if __name__ == "__main__":
                 print("Tower detected, placing block on top")
                 top = dynamic_grabber.find_closest(tower)
                 top[2,3] += 0.06  # Position slightly above tower top
-                q_place = dynamic_grabber.solve_ik(
+                q_place = dynamic_grabber.solve_ik_place(
                     dynamic_grabber.find_target_ee_pose(top), arm.get_positions())
                 if q_place is not None:
                     arm.safe_move_to_position(q_place)
@@ -542,6 +551,11 @@ if __name__ == "__main__":
                 print("No tower detected, using default position")
                 dynamic_grabber.put(0)  # Use default placement position
             
+
+            # Reset start time for velocity calculations
+            dynamic_grabber.start_time = time_in_seconds()
+            # dynamic_grabber.last_iteration_time = None
+
             # Return to scanning position
             dynamic_grabber.move_to_over(0)
             block_count += 1

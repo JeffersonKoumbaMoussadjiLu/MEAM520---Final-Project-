@@ -195,7 +195,7 @@ class DynamicGrabber():
         self.ik = ik
         self.fk = fk
         self.start_time = 0
-        self.last_iteration_time = None
+        # self.last_iteration_time = None
 
         if team == 'blue':
             # Positions to scan for blocks (blue team)
@@ -296,8 +296,12 @@ class DynamicGrabber():
         return best / np.linalg.norm(best)
 
     def solve_ik(self, target, seed):
+        print("TARGET: ", target)
+
         t = time_in_seconds()
         T = t - self.start_time
+        print("Time: ", T, t, self.start_time)
+
         print("seed: ", seed)
         _, T0e = fk.forward(seed)
 
@@ -308,7 +312,7 @@ class DynamicGrabber():
 
         q = seed
 
-        xdes = target[:3, 3].flatten() + np.array([0, 0.01, 0]) # destination offset
+        xdes = target[:3, 3].flatten() + np.array([-0.055, -0.03, 0]) # destination offset [-0.005, -0.03, 0])
         delta_x = xdes - curr_x
         print("delta: ", delta_x, xdes, curr_x, T)
         vdes = delta_x / T
@@ -338,10 +342,10 @@ class DynamicGrabber():
         dq = IK_velocity_null(q, v, omega, -k0*(q - q_e)).flatten()
         print("dq: ", dq)
         # Time step
-        if self.last_iteration_time is None:
-            self.last_iteration_time = time_in_seconds()
-        # self.dt = time_in_seconds() - self.last_iteration_time
-        self.last_iteration_time = time_in_seconds()
+        # if self.last_iteration_time is None:
+        #     self.last_iteration_time = time_in_seconds()
+        # # self.dt = time_in_seconds() - self.last_iteration_time
+        # self.last_iteration_time = time_in_seconds()
 
         new_q = q + dq
         print(new_q)
@@ -426,6 +430,7 @@ class DynamicGrabber():
         return np.array([-0.1344,0.1814,-0.1515,-1.1668,0.0279,1.3463,0.5082]) if team == 'blue' else np.array([0.2123,0.1799,0.058,-1.1669,-0.0106,1.3465,1.0525])
 
     def _apply_calibration_offsets(self):
+        '''
         if self.team == 'blue':
             self.H_ee_camera[0,-1] -= 0.035
             self.H_ee_camera[1,-1] += 0.005
@@ -434,6 +439,7 @@ class DynamicGrabber():
             self.H_ee_camera[0,-1] += 0.01
             self.H_ee_camera[1,-1] -= 0.036
             self.H_ee_camera[2,-1] += 0.008
+        '''
 
 
 if __name__ == "__main__":
